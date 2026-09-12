@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Lesson — Speak Up</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600&family=Work+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+
+<header class="topbar container">
+  <a class="brand" href="dashboard.html"><span class="brand-mark">◐</span> Speak Up</a>
+  <nav>
+    <a href="dashboard.html">All levels</a>
+    <a href="speaking-partner.html">AI speaking partner</a>
+  </nav>
+</header>
+
+<section class="container">
+  <div class="lesson-header">
+    <h1 id="level-title">Level</h1>
+    <p id="level-subtitle"></p>
+  </div>
+
+  <div id="unit-list" class="grid"></div>
+
+  <div id="unit-detail" style="display:none;">
+    <button class="btn btn-ghost" id="back-to-units">← Back to units</button>
+    <h2 id="unit-title"></h2>
+    <div id="word-list"></div>
+    <div class="level-card" style="margin-top:24px;">
+      <h3>Speaking practice</h3>
+      <p id="speaking-prompt-text"></p>
+      <a class="btn btn-gold" id="go-to-partner">Practice with the AI speaking partner</a>
+      <button class="btn btn-primary" id="mark-complete" style="margin-top:8px;">Mark this unit complete</button>
+    </div>
+  </div>
+</section>
+
+<footer class="site container">Speak Up — practice out loud, every day.</footer>
+
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
+<script src="js/firebase-config.js"></script>
+<script src="js/auth.js"></script>
+<script src="data/curriculum.js"></script>
+<script src="js/progress.js"></script>
+<script src="js/speech.js"></script>
+<script>
+  const params = new URLSearchParams(window.location.search);
+  const levelId = params.get("level") || "level0";
+  const level = CURRICULUM.find((l) => l.id === levelId);
+
+  document.getElementById("level-title").textContent = level.title;
+  document.getElementById("level-subtitle").textContent = level.subtitle;
+
+  const unitListEl = document.getElementById("unit-list");
+  const unitDetailEl = document.getElementById("unit-detail");
+  let currentUser = null;
+
+  requireAuth((user) => { currentUser = user; });
+
+  function renderUnitList() {
+    unitListEl.style.display = "grid";
+    unitDetailEl.style.display = "none";
+    unitListEl.innerHTML = "";
+    level.units.forEach((unit) => {
+      const card = document.createElement("a");
+      card.href = "#";
+      card.className = "level-card";
+      card.innerHTML = `<h3>${unit.title}</h3><p style="margin:0">${unit.words.length} words + speaking practice</p>`;
+      card.addEventListener("click", (e) => { e.preventDefault(); renderUnitDetail(unit); });
+      unitListEl.appendChild(card);
+    });
+  }
+
+  function renderUnitDetail(unit) {
+    unitListEl.style.display = "none";
+    unitDetailEl.style.display = "block";
+    document.getElementById("unit-title").textContent = unit.title;
+    document.getElementById("speaking-prompt-text").textContent = unit.speakingPrompt;
+
+    const wordListEl = document.getElementById("word-list");
+    wordListEl.innerHTML = "";
+    unit.words.forEach((word) => {
+      const row = document.createElement("div");
+      row.className = "word-card";
+      row.innerHTML = `
+        <div>
+          <div class="word-en">${word.en}</div>
+          ${word.hint ? `<div class="word-native">${word.hint}</div>` : ""}
+        </div>
+        <button class="speak-icon-btn" title="Hear it" aria-label="Hear this word">🔊</button>
+      `;
+      row.querySelector("button").addEventListener("click", () => SpeechEngine.speak(word.en));
+      wordListEl.appendChild(row);
+    });
+
+    const partnerLink = document.getElementById("go-to-partner");
+    partnerLink.href = `speaking-partner.html?level=${level.id}&topic=${encodeURIComponent(unit.speakingPrompt)}`;
+
+    document.getElementById("mark-complete").onclick = async () => {
+      if (!currentUser) return;
+      await markUnitComplete(currentUser.uid, unit.id, level.id);
+      renderUnitList();
+    };
+  }
+
+  document.getElementById("back-to-units").addEventListener("click", renderUnitList);
+  renderUnitList();
+</script>
+</body>
+</html>

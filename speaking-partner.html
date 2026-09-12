@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>AI speaking partner — Speak Up</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600&family=Work+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+
+<header class="topbar container">
+  <a class="brand" href="dashboard.html"><span class="brand-mark">◐</span> Speak Up</a>
+  <nav>
+    <a href="dashboard.html">All levels</a>
+  </nav>
+</header>
+
+<section class="container">
+  <h1>AI speaking partner</h1>
+  <p id="topic-line">Tap the microphone and start talking — or type if you'd rather.</p>
+
+  <div class="chat-shell">
+    <div class="chat-log" id="chat-log"></div>
+    <p class="status-line" id="status-line"></p>
+    <div class="chat-controls">
+      <button class="mic-btn" id="mic-btn" aria-label="Start speaking">🎤</button>
+      <input type="text" id="text-input" placeholder="...or type your reply" />
+      <button class="btn btn-primary" id="send-btn">Send</button>
+    </div>
+  </div>
+</section>
+
+<footer class="site container">Speak Up — practice out loud, every day.</footer>
+
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
+<script src="js/firebase-config.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/speech.js"></script>
+<script src="js/ai-partner.js"></script>
+<script>
+  requireAuth(async (user) => {
+    const progress = await getProgressSafe(user.uid);
+    startConversation(progress.currentLevel || "level0");
+  });
+
+  // progress.js isn't loaded on this page to keep it lightweight;
+  // this small helper reads just the one field we need.
+  async function getProgressSafe(uid) {
+    try {
+      const doc = await db.collection("users").doc(uid).get();
+      return doc.exists ? doc.data() : {};
+    } catch (e) {
+      return {};
+    }
+  }
+
+  const params = new URLSearchParams(window.location.search);
+  const topic = params.get("topic");
+  if (topic) document.getElementById("topic-line").textContent = "Today's topic: " + topic;
+
+  const chatLog = document.getElementById("chat-log");
+  const statusLine = document.getElementById("status-line");
+  const micBtn = document.getElementById("mic-btn");
+  const textInput = document.getElementById("text-input");
+  const sendBtn = document.getElementById("send-btn");
+  let currentLevel = "level0";
+
+  function addBubble(text, who) {
+    const div = document.createElement("div");
+    div.className = "bubble " + who;
+    div.textContent = text;
+    chatLog.appendChild(div);
+    chatLog.scrollTop = chatLog.scrollHeight;
+  }
+
+  async function startConversation(level) {
+    currentLevel = level;
+    const opener = topic
+      ? `Hi! Let's talk about this: ${topic}. Tell me a little to get started.`
+      : "Hi! I'm your speaking partner. What would you like to talk about today?";
+    AIPartner.reset();
+    addBubble(opener, "ai");
+    SpeechEngine.speak(opener);
+  }
+
+  async function handleUserMessage(text) {
+    if (!text.trim()) return;
+    addBubble(text, "user");
+    textInput.value = "";
+    statusLine.textContent = "Thinking...";
+    try {
+      const reply = await AIPartner.send(text, currentLevel);
+      addBubble(reply, "ai");
+      SpeechEngine.speak(reply);
+      statusLine.textContent = "";
+    } catch (err) {
+      statusLine.textContent = err.message;
+    }
+  }
+
+  micBtn.addEventListener("click", () => {
+    if (!SpeechEngine.isSupported()) {
+      statusLine.textContent = "Voice input isn't supported in this browser — try typing instead.";
+      return;
+    }
+    micBtn.classList.add("listening");
+    statusLine.textContent = "Listening...";
+    SpeechEngine.listenOnce({
+      onResult: (transcript) => handleUserMessage(transcript),
+      onError: (err) => { statusLine.textContent = "Didn't catch that (" + err + "). Try again."; },
+      onEnd: () => micBtn.classList.remove("listening")
+    });
+  });
+
+  sendBtn.addEventListener("click", () => handleUserMessage(textInput.value));
+  textInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") handleUserMessage(textInput.value);
+  });
+</script>
+</body>
+</html>

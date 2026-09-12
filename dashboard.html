@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Your levels — Speak Up</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600&family=Work+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+
+<header class="topbar container">
+  <a class="brand" href="dashboard.html"><span class="brand-mark">◐</span> Speak Up</a>
+  <nav>
+    <span id="greeting"></span>
+    <a href="speaking-partner.html">AI speaking partner</a>
+    <a href="#" id="logout-link">Log out</a>
+  </nav>
+</header>
+
+<section class="container">
+  <h1>Choose where to practice</h1>
+  <p>Levels unlock in order. Finish every unit in a level to move to the next.</p>
+  <div class="grid" id="level-grid"></div>
+</section>
+
+<footer class="site container">Speak Up — practice out loud, every day.</footer>
+
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
+<script src="js/firebase-config.js"></script>
+<script src="js/auth.js"></script>
+<script src="data/curriculum.js"></script>
+<script src="js/progress.js"></script>
+<script>
+  requireAuth(async (user) => {
+    document.getElementById("greeting").textContent = "Hi, " + (user.displayName || "there");
+    const progress = await getProgress(user.uid);
+
+    const grid = document.getElementById("level-grid");
+    CURRICULUM.forEach((level) => {
+      const unlocked = levelIsUnlocked(level.id, progress);
+      const pct = levelCompletionPct(level, progress);
+      const card = document.createElement("a");
+      card.href = unlocked ? `lesson.html?level=${level.id}` : "#";
+      card.className = "level-card" + (unlocked ? "" : " locked");
+      card.innerHTML = `
+        <span class="level-tag">${unlocked ? (pct === 100 ? "Complete" : "In progress") : "Locked"}</span>
+        <h3>${level.title}</h3>
+        <p style="margin:0">${level.subtitle}</p>
+        <div class="level-progress"><span style="width:${pct}%"></span></div>
+      `;
+      grid.appendChild(card);
+    });
+  });
+
+  document.getElementById("logout-link").addEventListener("click", async (e) => {
+    e.preventDefault();
+    await logOut();
+    window.location.href = "index.html";
+  });
+</script>
+</body>
+</html>
